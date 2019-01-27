@@ -2,13 +2,21 @@
 
 namespace PhpunitMemoryAndTimeUsageListener\Listener\Measurement;
 
+use PHPUnit\Framework\TestCase;
 use PhpunitMemoryAndTimeUsageListener\Domain\Measurement\MemoryMeasurement;
 use PhpunitMemoryAndTimeUsageListener\Domain\Measurement\TestMeasurement;
 use PhpunitMemoryAndTimeUsageListener\Domain\Measurement\TimeMeasurement;
+use PHPUnit\Framework\TestListener;
+use PHPUnit\Framework\TestSuite;
+use PHPUnit\Framework\TestListenerDefaultImplementation;
+use PHPUnit\Framework\Test;
 
-class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
+class TimeAndMemoryTestListener implements TestListener
 {
-    /** @var int  */
+
+  use TestListenerDefaultImplementation;
+
+  /** @var int  */
     protected $testSuitesRunning = 0;
 
     /** @var TestMeasurement[] */
@@ -48,100 +56,56 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
     }
 
     /**
-     * @param \PHPUnit_Framework_Test $test
+     * @param Test $test
      */
-    public function startTest(\PHPUnit_Framework_Test $test)
+    public function startTest(Test $test): void
     {
         $this->memoryUsage = memory_get_usage();
         $this->memoryPeakIncrease = memory_get_peak_usage();
     }
 
     /**
-     * @param \PHPUnit_Framework_Test $test
+     * @param Test $test
      * @param $time
      */
-    public function endTest(\PHPUnit_Framework_Test $test, $time)
+    public function endTest(Test $test, float $time): void
     {
         $this->executionTime = new TimeMeasurement($time);
-        $this->memoryUsage = memory_get_usage() - ($this->memoryUsage);
-        $this->memoryPeakIncrease = memory_get_peak_usage() - ($this->memoryPeakIncrease);
+        $this->memoryUsage = memory_get_usage() - $this->memoryUsage;
+        $this->memoryPeakIncrease = memory_get_peak_usage() - $this->memoryPeakIncrease;
 
-        if ($this->haveToSaveTestMeasurement($time)) {
+        if ($this->haveToSaveTestMeasurement()) {
+            $name = ($test instanceof TestCase) ? $test->getName() : '';
             $this->testMeasurementCollection[] = new TestMeasurement(
-                $test->getName(),
+                $name,
                 get_class($test),
                 $this->executionTime,
-                (new MemoryMeasurement($this->memoryUsage)),
-                (new MemoryMeasurement($this->memoryPeakIncrease))
+                new MemoryMeasurement($this->memoryUsage),
+                new MemoryMeasurement($this->memoryPeakIncrease)
             );
         }
     }
 
     /**
-     * @param \PHPUnit_Framework_Test $test
-     * @param \Exception              $exception
-     * @param float                   $time
+     * @param TestSuite $suite
      */
-    public function addError(\PHPUnit_Framework_Test $test, \Exception $exception, $time)
-    {
-    }
-
-    /**
-     * @param \PHPUnit_Framework_Test                 $test
-     * @param \PHPUnit_Framework_AssertionFailedError $exception
-     * @param float                                   $time
-     */
-    public function addFailure(\PHPUnit_Framework_Test $test, \PHPUnit_Framework_AssertionFailedError $exception, $time)
-    {
-    }
-
-    /**
-     * @param \PHPUnit_Framework_Test $test
-     * @param \Exception              $exception
-     * @param float                   $time
-     */
-    public function addIncompleteTest(\PHPUnit_Framework_Test $test, \Exception $exception, $time)
-    {
-    }
-
-    /**
-     * @param \PHPUnit_Framework_Test $test
-     * @param \Exception              $exception
-     * @param float                   $time
-     */
-    public function addRiskyTest(\PHPUnit_Framework_Test $test, \Exception $exception, $time)
-    {
-    }
-
-    /**
-     * @param \PHPUnit_Framework_Test $test
-     * @param \Exception              $exception
-     * @param float                   $time
-     */
-    public function addSkippedTest(\PHPUnit_Framework_Test $test, \Exception $exception, $time)
-    {
-    }
-
-    /**
-     * @param \PHPUnit_Framework_TestSuite $suite
-     */
-    public function startTestSuite(\PHPUnit_Framework_TestSuite $suite)
+    public function startTestSuite(TestSuite $suite): void
     {
         $this->testSuitesRunning++;
     }
 
     /**
-     * @param \PHPUnit_Framework_TestSuite $suite
+     * @param TestSuite $suite
      */
-    public function endTestSuite(\PHPUnit_Framework_TestSuite $suite)
+    public function endTestSuite(TestSuite $suite): void
     {
         $this->testSuitesRunning--;
 
         if ((0 === $this->testSuitesRunning) && (0 < count($this->testMeasurementCollection))) {
-            echo PHP_EOL . "Time & Memory measurement results: " . PHP_EOL;
+            echo PHP_EOL . 'Time & Memory measurement results: ' . PHP_EOL;
             $i = 1;
             foreach ($this->testMeasurementCollection as $testMeasurement) {
-                echo PHP_EOL . $i . " - " . $testMeasurement->measuredInformationMessage();
+                echo PHP_EOL . $i . ' - ' . $testMeasurement->measuredInformationMessage();
                 $i++;
             }
         }
@@ -150,7 +114,7 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
     /**
      * @return bool
      */
-    protected function haveToSaveTestMeasurement()
+    protected function haveToSaveTestMeasurement(): bool
     {
         return ((false === $this->showOnlyIfEdgeIsExceeded)
             || ((true === $this->showOnlyIfEdgeIsExceeded)
@@ -167,7 +131,7 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
      *
      * @return bool
      */
-    protected function isAPotentialCriticalTimeUsage()
+    protected function isAPotentialCriticalTimeUsage(): bool
     {
         return $this->checkEdgeIsOverTaken($this->executionTime->timeInMilliseconds(), $this->executionTimeEdge);
     }
@@ -177,7 +141,7 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
      *
      * @return bool
      */
-    protected function isAPotentialCriticalMemoryUsage()
+    protected function isAPotentialCriticalMemoryUsage(): bool
     {
         return $this->checkEdgeIsOverTaken($this->memoryUsage, $this->memoryUsageEdge);
     }
@@ -187,7 +151,7 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
      *
      * @return bool
      */
-    protected function isAPotentialCriticalMemoryPeakUsage()
+    protected function isAPotentialCriticalMemoryPeakUsage(): bool
     {
         return $this->checkEdgeIsOverTaken($this->memoryPeakIncrease, $this->memoryPeakDifferenceEdge);
     }
@@ -197,7 +161,7 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
      * @param $edgeValue
      * @return bool
      */
-    protected function checkEdgeIsOverTaken($value, $edgeValue)
+    protected function checkEdgeIsOverTaken($value, $edgeValue): bool
     {
         return ($value >= $edgeValue);
     }
@@ -205,7 +169,7 @@ class TimeAndMemoryTestListener implements \PHPUnit_Framework_TestListener
     /**
      * @param $configurationOptions
      */
-    protected function setConfigurationOptions($configurationOptions)
+    protected function setConfigurationOptions($configurationOptions): void
     {
         if (isset($configurationOptions['showOnlyIfEdgeIsExceeded'])) {
             $this->showOnlyIfEdgeIsExceeded = $configurationOptions['showOnlyIfEdgeIsExceeded'];
